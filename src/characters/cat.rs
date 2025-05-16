@@ -31,6 +31,6 @@ pub fn setup_cat(
             y: 0.5,
             ..Default::default()
         },
-        StateScoped(State::Loading),
+        StateScoped(State::Playing),
     ));
 }

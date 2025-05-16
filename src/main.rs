@@ -1,22 +1,21 @@
 use area::setup_area;
 use bevy::{
-    app::PreStartup,
+    input_focus::{InputDispatchPlugin, directional_navigation::DirectionalNavigationPlugin},
     prelude::{
-        App, AppExtStates, Assets, Camera3d, Circle, ClearColor, Color, Commands, Cuboid,
-        DefaultPlugins, Mesh, Mesh3d, MeshMaterial3d, Name, PluginGroup, PointLight, Quat, ResMut,
-        Resource, StandardMaterial, Startup, StateScoped, Transform, Vec3, Window, WindowPlugin,
-        default,
+        App, AppExtStates, Camera3d, ClearColor, Color, Commands, DefaultPlugins, PluginGroup,
+        PointLight, Resource, Transform, Vec3, Window, WindowPlugin, default,
     },
+    state::state::OnEnter,
 };
-#[cfg(feature = "debug")]
-use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
 mod area;
-mod cat;
+mod characters;
 mod state;
+mod ui;
 
-use cat::{Cat, setup_cat};
+use characters::{Cat, setup_cat};
 use state::State;
+use ui::MainMenuPlugin;
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
@@ -40,18 +39,25 @@ struct Game {
 fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::BLACK))
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Cat Game".to_string(),
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Cat Game".to_string(),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
-            ..Default::default()
-        }))
+            DirectionalNavigationPlugin,
+            InputDispatchPlugin,
+        ))
         .init_resource::<Game>()
         .init_state::<State>()
-        .enable_state_scoped_entities::<State>();
-    app.add_systems(PreStartup, setup_camera)
-        .add_systems(Startup, (setup_area, setup_cat));
+        .enable_state_scoped_entities::<State>()
+        .add_plugins(MainMenuPlugin)
+        .add_systems(
+            OnEnter(State::Playing),
+            (setup_camera, setup_area, setup_cat),
+        );
     //app.add_systems(Update, move_cube);
     app.run();
 }
