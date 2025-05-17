@@ -1,6 +1,5 @@
 use area::setup_area;
 use bevy::{
-    input_focus::{InputDispatchPlugin, directional_navigation::DirectionalNavigationPlugin},
     prelude::{
         App, AppExtStates, Camera3d, ClearColor, Color, Commands, DefaultPlugins, PluginGroup,
         PointLight, Resource, Transform, Vec3, Window, WindowPlugin, default,
@@ -39,17 +38,13 @@ struct Game {
 fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::BLACK))
-        .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Cat Game".to_string(),
-                    ..Default::default()
-                }),
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Cat Game".to_string(),
                 ..Default::default()
             }),
-            DirectionalNavigationPlugin,
-            InputDispatchPlugin,
-        ))
+            ..Default::default()
+        }))
         .init_resource::<Game>()
         .init_state::<State>()
         .enable_state_scoped_entities::<State>()
