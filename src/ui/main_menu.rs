@@ -9,6 +9,7 @@ use bevy::{
         name::Name,
         observer::Trigger,
         query::With,
+        resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
     },
@@ -23,7 +24,7 @@ use bevy::{
     prelude::{Deref, DerefMut},
     state::{
         condition::in_state,
-        state::{NextState, OnExit},
+        state::{NextState, OnEnter, OnExit},
     },
     time::{Time, Timer, TimerMode},
     ui::{
@@ -34,7 +35,7 @@ use bevy::{
     utils::default,
 };
 
-use crate::state::State;
+use crate::{Game, state::State};
 
 const NORMAL_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_400;
 const FOCUSED_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_500;
@@ -45,7 +46,7 @@ pub struct MainMenu;
 fn setup_ui(
     mut commands: Commands,
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
-    mut input_focus: ResMut<InputFocus>,
+    mut main_menu_state: ResMut<Game>,
 ) {
     commands.spawn(Camera2d);
 
@@ -147,7 +148,16 @@ fn setup_ui(
     ]);
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
     let top = button_entities[0];
-    input_focus.set(top);
+    main_menu_state.main_menu_state.focused_input = Some(top);
+}
+
+fn update_focused_entity(mut input_focus: ResMut<InputFocus>, main_menu_state: Res<Game>) {
+    match main_menu_state.main_menu_state.focused_input {
+        Some(entity) => {
+            input_focus.set(entity);
+        }
+        None => {}
+    }
 }
 
 fn navigate(
@@ -229,12 +239,20 @@ fn reset_button_after_interaction(
     }
 }
 
+#[derive(Resource, Default)]
+pub struct MainMenuState {
+    focused_input: Option<Entity>,
+}
+
 pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut bevy::app::App) {
         app.add_plugins((InputDispatchPlugin, DirectionalNavigationPlugin))
             .insert_resource(InputFocusVisible(true))
-            .add_systems(PostStartup, setup_ui)
+            .add_systems(
+                OnEnter(State::MainMenu),
+                (setup_ui, update_focused_entity).chain(),
+            )
             .add_systems(PreUpdate, navigate.run_if(in_state(State::MainMenu)))
             .add_systems(
                 Update,

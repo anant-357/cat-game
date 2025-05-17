@@ -9,12 +9,14 @@ use bevy::{
 
 mod area;
 mod characters;
+mod loading;
 mod state;
 mod ui;
 
 use characters::{Cat, setup_cat};
+use loading::{LoadingPlugin, LoadingState};
 use state::State;
-use ui::MainMenuPlugin;
+use ui::{MainMenuPlugin, MainMenuState};
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
@@ -32,6 +34,8 @@ fn setup_camera(mut commands: Commands) {
 
 #[derive(Resource, Default)]
 struct Game {
+    pub main_menu_state: MainMenuState,
+    pub loading_state: LoadingState,
     pub cat: Cat,
 }
 
@@ -45,10 +49,10 @@ fn main() {
             }),
             ..Default::default()
         }))
+        .add_plugins((LoadingPlugin, MainMenuPlugin))
         .init_resource::<Game>()
         .init_state::<State>()
         .enable_state_scoped_entities::<State>()
-        .add_plugins(MainMenuPlugin)
         .add_systems(
             OnEnter(State::Playing),
             (setup_camera, setup_area, setup_cat),

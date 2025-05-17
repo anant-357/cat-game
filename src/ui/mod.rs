@@ -1,3 +1,3 @@
 mod main_menu;
 
-pub use main_menu::MainMenuPlugin;
+pub use main_menu::{MainMenuPlugin, MainMenuState};
