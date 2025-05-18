@@ -16,5 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install system dependencies
+      run: sudo apt -y install alsa-base
     - name: Build
       run: cargo build --verbose
