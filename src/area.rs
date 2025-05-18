@@ -2,8 +2,11 @@ use bevy::prelude::{
     Assets, Circle, Color, Commands, Mesh, Mesh3d, MeshMaterial3d, Quat, ResMut, StandardMaterial,
     States, Transform,
 };
+use strum::{EnumCount, EnumIter, IntoStaticStr};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States, EnumIter, IntoStaticStr, EnumCount,
+)]
 pub enum Area {
     #[default]
     Cave,

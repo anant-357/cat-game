@@ -1,21 +1,16 @@
 use bevy::{
-    app::{AppExit, Plugin, PreUpdate, Update},
-    color::Srgba,
+    app::{Plugin, PreUpdate, Update},
     core_pipeline::core_2d::Camera2d,
     ecs::{
         component::Component,
         entity::Entity,
-        event::EventWriter,
         name::Name,
         query::With,
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
     },
     input::{ButtonInput, keyboard::KeyCode},
-    input_focus::{
-        InputDispatchPlugin, InputFocus, InputFocusVisible,
-        directional_navigation::{DirectionalNavigationMap, DirectionalNavigationPlugin},
-    },
+    input_focus::{InputFocus, directional_navigation::DirectionalNavigationMap},
     math::CompassOctant,
     state::{
         condition::in_state,
@@ -32,14 +27,14 @@ use super::common::{
 };
 
 #[derive(Component)]
-pub struct MainMenu;
+pub struct Options;
 
 fn setup_ui(
     mut commands: Commands,
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
     mut input_focus: ResMut<InputFocus>,
 ) {
-    commands.spawn(Camera2d).insert(MainMenu);
+    commands.spawn(Camera2d).insert(Options);
 
     let root_node = commands
         .spawn(Node {
@@ -47,7 +42,7 @@ fn setup_ui(
             height: Val::Percent(100.0),
             ..default()
         })
-        .insert(MainMenu)
+        .insert(Options)
         .id();
 
     let grid_root_entity = commands
@@ -64,32 +59,24 @@ fn setup_ui(
     commands.entity(root_node).add_child(grid_root_entity);
 
     let play_button_entity = commands
-        .spawn(get_button_bundle("Play".into()))
-        .with_child(Text::new("Play"))
+        .spawn(get_button_bundle("Option 1".into()))
+        .with_child(Text::new("Option 1"))
         .id();
     commands
         .entity(grid_root_entity)
         .add_child(play_button_entity);
 
-    let areas_button_entity = commands
-        .spawn(get_button_bundle("Choose Area".into()))
-        .with_child(Text::new("Choose Area"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(areas_button_entity);
-
     let options_button_entity = commands
-        .spawn(get_button_bundle("Options".into()))
-        .with_child(Text::new("Options"))
+        .spawn(get_button_bundle("Option 2".into()))
+        .with_child(Text::new("Option 2"))
         .id();
     commands
         .entity(grid_root_entity)
         .add_child(options_button_entity);
 
     let exit_button_entity = commands
-        .spawn(get_button_bundle("Exit".into()))
-        .with_child(Text::new("Exit"))
+        .spawn(get_button_bundle("Main Menu".to_string()))
+        .with_child(Text::new("Main Menu"))
         .id();
     commands
         .entity(grid_root_entity)
@@ -97,7 +84,6 @@ fn setup_ui(
 
     let button_entities: Vec<Entity> = Vec::from([
         play_button_entity,
-        areas_button_entity,
         options_button_entity,
         exit_button_entity,
     ]);
@@ -110,7 +96,6 @@ fn interact_with_focused_button(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     input_focus: Res<InputFocus>,
     query: Query<(Entity, &Name), With<Name>>,
-    mut exit: EventWriter<AppExit>,
     mut next_state: ResMut<NextState<State>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Space) {
@@ -118,17 +103,14 @@ fn interact_with_focused_button(
             for (e, name) in query.iter() {
                 if focused_entity == e {
                     match name.as_str() {
-                        "Play" => {
+                        "Option 1" => {
                             next_state.set(State::Playing);
                         }
-                        "Choose Area" => {
-                            next_state.set(State::ChooseArea);
-                        }
-                        "Options" => {
+                        "Option 2" => {
                             next_state.set(State::OptionsMenu);
                         }
-                        "Exit" => {
-                            exit.write(AppExit::Success);
+                        "Main Menu" => {
+                            next_state.set(State::MainMenu);
                         }
                         _ => (),
                     }
@@ -138,19 +120,17 @@ fn interact_with_focused_button(
     }
 }
 
-fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<MainMenu>>) {
+fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<Options>>) {
     for e in query.iter() {
         commands.entity(e).despawn();
     }
 }
 
-pub struct MainMenuPlugin;
-impl Plugin for MainMenuPlugin {
+pub struct OptionsPlugin;
+impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        app.add_plugins((InputDispatchPlugin, DirectionalNavigationPlugin))
-            .insert_resource(InputFocusVisible(true))
-            .add_systems(OnEnter(State::MainMenu), setup_ui)
-            .add_systems(PreUpdate, navigate.run_if(in_state(State::MainMenu)))
+        app.add_systems(OnEnter(State::OptionsMenu), setup_ui)
+            .add_systems(PreUpdate, navigate.run_if(in_state(State::OptionsMenu)))
             .add_systems(
                 Update,
                 (
@@ -158,8 +138,8 @@ impl Plugin for MainMenuPlugin {
                     interact_with_focused_button,
                     reset_button_after_interaction,
                 )
-                    .run_if(in_state(State::MainMenu)),
+                    .run_if(in_state(State::OptionsMenu)),
             )
-            .add_systems(OnExit(State::MainMenu), cleanup_main_menu);
+            .add_systems(OnExit(State::OptionsMenu), cleanup_main_menu);
     }
 }
