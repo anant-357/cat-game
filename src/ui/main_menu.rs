@@ -1,6 +1,7 @@
+use std::str::FromStr;
+
 use bevy::{
     app::{AppExit, Plugin, PreUpdate, Update},
-    color::Srgba,
     core_pipeline::core_2d::Camera2d,
     ecs::{
         component::Component,
@@ -19,11 +20,12 @@ use bevy::{
     math::CompassOctant,
     state::{
         condition::in_state,
-        state::{NextState, OnEnter, OnExit},
+        state::{NextState, OnEnter, OnExit, States},
     },
     ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
     utils::default,
 };
+use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 use crate::state::State;
 
@@ -33,6 +35,28 @@ use super::common::{
 
 #[derive(Component)]
 pub struct MainMenu;
+
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Default,
+    States,
+    EnumIter,
+    IntoStaticStr,
+    EnumCount,
+    EnumString,
+)]
+pub enum MainMenuEnum {
+    #[default]
+    Play,
+    ChooseArea,
+    Options,
+    Exit,
+}
 
 fn setup_ui(
     mut commands: Commands,
@@ -63,44 +87,17 @@ fn setup_ui(
 
     commands.entity(root_node).add_child(grid_root_entity);
 
-    let play_button_entity = commands
-        .spawn(get_button_bundle("Play".into()))
-        .with_child(Text::new("Play"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(play_button_entity);
+    let mut button_entities: Vec<Entity> = Vec::new();
+    for option in MainMenuEnum::iter() {
+        let name: &'static str = option.into();
+        let button_entity = commands
+            .spawn(get_button_bundle(name.into()))
+            .with_child(Text::new(name.to_string()))
+            .id();
+        commands.entity(grid_root_entity).add_child(button_entity);
+        button_entities.push(button_entity);
+    }
 
-    let areas_button_entity = commands
-        .spawn(get_button_bundle("Choose Area".into()))
-        .with_child(Text::new("Choose Area"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(areas_button_entity);
-
-    let options_button_entity = commands
-        .spawn(get_button_bundle("Options".into()))
-        .with_child(Text::new("Options"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(options_button_entity);
-
-    let exit_button_entity = commands
-        .spawn(get_button_bundle("Exit".into()))
-        .with_child(Text::new("Exit"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(exit_button_entity);
-
-    let button_entities: Vec<Entity> = Vec::from([
-        play_button_entity,
-        areas_button_entity,
-        options_button_entity,
-        exit_button_entity,
-    ]);
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
     let top = button_entities[0];
     input_focus.set(top);
@@ -117,17 +114,17 @@ fn interact_with_focused_button(
         if let Some(focused_entity) = input_focus.0 {
             for (e, name) in query.iter() {
                 if focused_entity == e {
-                    match name.as_str() {
-                        "Play" => {
+                    match MainMenuEnum::from_str(name.as_str()) {
+                        Ok(MainMenuEnum::Play) => {
                             next_state.set(State::Playing);
                         }
-                        "Choose Area" => {
+                        Ok(MainMenuEnum::ChooseArea) => {
                             next_state.set(State::ChooseArea);
                         }
-                        "Options" => {
+                        Ok(MainMenuEnum::Options) => {
                             next_state.set(State::OptionsMenu);
                         }
-                        "Exit" => {
+                        Ok(MainMenuEnum::Exit) => {
                             exit.write(AppExit::Success);
                         }
                         _ => (),

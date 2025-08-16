@@ -1,4 +1,4 @@
-mod areas_menu;
+pub(crate) mod areas_menu;
 mod common;
 mod main_menu;
 mod options_menu;

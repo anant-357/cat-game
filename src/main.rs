@@ -1,42 +1,27 @@
 use area::setup_area;
 use bevy::{
     prelude::{
-        App, AppExtStates, Camera3d, ClearColor, Color, Commands, DefaultPlugins, PluginGroup,
-        PointLight, Resource, Transform, Vec3, Window, WindowPlugin, default,
+        App, AppExtStates, ClearColor, Color, DefaultPlugins, IntoScheduleConfigs, PluginGroup,
+        Resource, Update, Window, WindowPlugin, in_state,
     },
     state::state::OnEnter,
 };
 
 mod area;
+mod camera;
 mod characters;
 mod loading;
 mod state;
 mod ui;
 
-use characters::{Cat, setup_cat};
-use loading::{LoadingPlugin, LoadingState};
+use camera::{orbit_camera, setup_camera};
+use characters::{Cat, change_mode, move_cat, setup_cat};
+use loading::LoadingPlugin;
 use state::State;
 use ui::{AreasMenuPlugin, MainMenuPlugin, OptionsPlugin};
 
-fn setup_camera(mut commands: Commands) {
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-}
-
 #[derive(Resource, Default)]
-struct Game {
-    pub loading_state: LoadingState,
-    pub cat: Cat,
-}
+struct Game {}
 
 fn main() {
     let mut app = App::new();
@@ -59,8 +44,11 @@ fn main() {
         .enable_state_scoped_entities::<State>()
         .add_systems(
             OnEnter(State::Playing),
-            (setup_camera, setup_area, setup_cat),
+            (setup_area, setup_cat, setup_camera.after(setup_cat)),
+        )
+        .add_systems(
+            Update,
+            (orbit_camera, change_mode, move_cat).run_if(in_state(State::Playing)),
         );
-    //app.add_systems(Update, move_cube);
     app.run();
 }

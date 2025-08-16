@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bevy::{
     app::{Plugin, PreUpdate, Update},
     core_pipeline::core_2d::Camera2d,
@@ -14,11 +16,12 @@ use bevy::{
     math::CompassOctant,
     state::{
         condition::in_state,
-        state::{NextState, OnEnter, OnExit},
+        state::{NextState, OnEnter, OnExit, States},
     },
     ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
     utils::default,
 };
+use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 use crate::state::State;
 
@@ -28,6 +31,27 @@ use super::common::{
 
 #[derive(Component)]
 pub struct Options;
+
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Default,
+    States,
+    EnumIter,
+    IntoStaticStr,
+    EnumCount,
+    EnumString,
+)]
+pub enum OptionsEnum {
+    #[default]
+    Option_1,
+    Option_2,
+    Main_Menu,
+}
 
 fn setup_ui(
     mut commands: Commands,
@@ -58,35 +82,16 @@ fn setup_ui(
 
     commands.entity(root_node).add_child(grid_root_entity);
 
-    let play_button_entity = commands
-        .spawn(get_button_bundle("Option 1".into()))
-        .with_child(Text::new("Option 1"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(play_button_entity);
-
-    let options_button_entity = commands
-        .spawn(get_button_bundle("Option 2".into()))
-        .with_child(Text::new("Option 2"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(options_button_entity);
-
-    let exit_button_entity = commands
-        .spawn(get_button_bundle("Main Menu".to_string()))
-        .with_child(Text::new("Main Menu"))
-        .id();
-    commands
-        .entity(grid_root_entity)
-        .add_child(exit_button_entity);
-
-    let button_entities: Vec<Entity> = Vec::from([
-        play_button_entity,
-        options_button_entity,
-        exit_button_entity,
-    ]);
+    let mut button_entities: Vec<Entity> = Vec::new();
+    for option in OptionsEnum::iter() {
+        let name: &'static str = option.into();
+        let button = commands
+            .spawn(get_button_bundle(name.into()))
+            .with_child(Text::new(name.to_string()))
+            .id();
+        commands.entity(grid_root_entity).add_child(button);
+        button_entities.push(button);
+    }
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
     let top = button_entities[0];
     input_focus.set(top);
@@ -102,14 +107,8 @@ fn interact_with_focused_button(
         if let Some(focused_entity) = input_focus.0 {
             for (e, name) in query.iter() {
                 if focused_entity == e {
-                    match name.as_str() {
-                        "Option 1" => {
-                            next_state.set(State::Playing);
-                        }
-                        "Option 2" => {
-                            next_state.set(State::OptionsMenu);
-                        }
-                        "Main Menu" => {
+                    match OptionsEnum::from_str(name.as_str()) {
+                        Ok(OptionsEnum::Main_Menu) => {
                             next_state.set(State::MainMenu);
                         }
                         _ => (),
