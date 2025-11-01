@@ -2,11 +2,9 @@ use std::str::FromStr;
 
 use bevy::{
     app::{AppExit, Plugin, PreUpdate, Update},
-    core_pipeline::core_2d::Camera2d,
     ecs::{
-        component::Component,
         entity::Entity,
-        event::EventWriter,
+        message::MessageWriter,
         name::Name,
         query::With,
         schedule::IntoScheduleConfigs,
@@ -20,21 +18,19 @@ use bevy::{
     math::CompassOctant,
     state::{
         condition::in_state,
-        state::{NextState, OnEnter, OnExit, States},
+        state::{NextState, OnEnter, States},
+        state_scoped::DespawnOnExit,
     },
     ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
     utils::default,
 };
 use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-use crate::state::State;
+use crate::{game::camera::setup_camera, state::State, ui::common::spawn_camera};
 
 use super::common::{
     get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
 };
-
-#[derive(Component)]
-pub struct MainMenu;
 
 #[derive(
     Clone,
@@ -63,26 +59,29 @@ fn setup_ui(
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
     mut input_focus: ResMut<InputFocus>,
 ) {
-    commands.spawn(Camera2d).insert(MainMenu);
-
     let root_node = commands
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        })
-        .insert(MainMenu)
+        .spawn((
+            DespawnOnExit(State::MainMenu),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+        ))
         .id();
 
     let grid_root_entity = commands
-        .spawn(Node {
-            display: Display::Grid,
-            width: Val::Percent(100.),
-            height: Val::Percent(100.),
-            grid_template_columns: RepeatedGridTrack::auto(1),
-            grid_template_rows: RepeatedGridTrack::auto(3),
-            ..default()
-        })
+        .spawn((
+            DespawnOnExit(State::MainMenu),
+            Node {
+                display: Display::Grid,
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                grid_template_columns: RepeatedGridTrack::auto(1),
+                grid_template_rows: RepeatedGridTrack::auto(3),
+                ..default()
+            },
+        ))
         .id();
 
     commands.entity(root_node).add_child(grid_root_entity);
@@ -91,7 +90,10 @@ fn setup_ui(
     for option in MainMenuEnum::iter() {
         let name: &'static str = option.into();
         let button_entity = commands
-            .spawn(get_button_bundle(name.into()))
+            .spawn((
+                DespawnOnExit(State::MainMenu),
+                get_button_bundle(name.into()),
+            ))
             .with_child(Text::new(name.to_string()))
             .id();
         commands.entity(grid_root_entity).add_child(button_entity);
@@ -107,7 +109,7 @@ fn interact_with_focused_button(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     input_focus: Res<InputFocus>,
     query: Query<(Entity, &Name), With<Name>>,
-    mut exit: EventWriter<AppExit>,
+    mut exit: MessageWriter<AppExit>,
     mut next_state: ResMut<NextState<State>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Space) {
@@ -135,18 +137,15 @@ fn interact_with_focused_button(
     }
 }
 
-fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<MainMenu>>) {
-    for e in query.iter() {
-        commands.entity(e).despawn();
-    }
-}
-
 pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut bevy::app::App) {
         app.add_plugins((InputDispatchPlugin, DirectionalNavigationPlugin))
             .insert_resource(InputFocusVisible(true))
-            .add_systems(OnEnter(State::MainMenu), setup_ui)
+            .add_systems(
+                OnEnter(State::MainMenu),
+                (spawn_camera, setup_ui.after(spawn_camera)),
+            )
             .add_systems(PreUpdate, navigate.run_if(in_state(State::MainMenu)))
             .add_systems(
                 Update,
@@ -156,7 +155,6 @@ impl Plugin for MainMenuPlugin {
                     reset_button_after_interaction,
                 )
                     .run_if(in_state(State::MainMenu)),
-            )
-            .add_systems(OnExit(State::MainMenu), cleanup_main_menu);
+            );
     }
 }

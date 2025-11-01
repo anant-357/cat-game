@@ -1,6 +1,6 @@
 use bevy::{
     app::{Plugin, PreUpdate, Update},
-    core_pipeline::core_2d::Camera2d,
+    camera::Camera2d,
     ecs::{
         component::Component,
         entity::Entity,
@@ -22,7 +22,7 @@ use bevy::{
 };
 use strum::{EnumCount, IntoEnumIterator};
 
-use crate::{area::Area, state::State};
+use crate::{game::area::Area, state::State, ui::common::spawn_camera};
 
 use super::common::{
     get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
@@ -124,17 +124,20 @@ fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<Areas>>) 
 pub struct AreasMenuPlugin;
 impl Plugin for AreasMenuPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        app.add_systems(OnEnter(State::ChooseArea), setup_ui)
-            .add_systems(PreUpdate, navigate.run_if(in_state(State::ChooseArea)))
-            .add_systems(
-                Update,
-                (
-                    highlight_focused_element,
-                    interact_with_focused_button,
-                    reset_button_after_interaction,
-                )
-                    .run_if(in_state(State::ChooseArea)),
+        app.add_systems(
+            OnEnter(State::ChooseArea),
+            (spawn_camera, setup_ui.after(spawn_camera)),
+        )
+        .add_systems(PreUpdate, navigate.run_if(in_state(State::ChooseArea)))
+        .add_systems(
+            Update,
+            (
+                highlight_focused_element,
+                interact_with_focused_button,
+                reset_button_after_interaction,
             )
-            .add_systems(OnExit(State::ChooseArea), cleanup_main_menu);
+                .run_if(in_state(State::ChooseArea)),
+        )
+        .add_systems(OnExit(State::ChooseArea), cleanup_main_menu);
     }
 }

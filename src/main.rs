@@ -1,4 +1,3 @@
-use area::setup_area;
 use bevy::{
     prelude::{
         App, AppExtStates, ClearColor, Color, DefaultPlugins, IntoScheduleConfigs, PluginGroup,
@@ -6,19 +5,21 @@ use bevy::{
     },
     state::state::OnEnter,
 };
+use game::area::setup_area;
 
-mod area;
-mod camera;
 mod characters;
+mod game;
 mod loading;
 mod state;
 mod ui;
 
-use camera::{orbit_camera, setup_camera};
 use characters::{Cat, change_mode, move_cat, setup_cat};
+use game::camera::{orbit_camera_keyboard, orbit_camera_mouse, setup_camera};
 use loading::LoadingPlugin;
 use state::State;
 use ui::{AreasMenuPlugin, MainMenuPlugin, OptionsPlugin};
+
+use crate::characters::exit_play;
 
 #[derive(Resource, Default)]
 struct Game {}
@@ -41,14 +42,20 @@ fn main() {
         ))
         .init_resource::<Game>()
         .init_state::<State>()
-        .enable_state_scoped_entities::<State>()
         .add_systems(
             OnEnter(State::Playing),
             (setup_area, setup_cat, setup_camera.after(setup_cat)),
         )
         .add_systems(
             Update,
-            (orbit_camera, change_mode, move_cat).run_if(in_state(State::Playing)),
+            (
+                orbit_camera_keyboard,
+                orbit_camera_mouse,
+                change_mode,
+                move_cat,
+                exit_play,
+            )
+                .run_if(in_state(State::Playing)),
         );
     app.run();
 }

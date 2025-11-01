@@ -1,10 +1,12 @@
 use bevy::{
+    camera::Camera2d,
     color::{Color, Srgba},
     ecs::{
         component::Component,
         entity::Entity,
         name::Name,
-        system::{Query, Res},
+        query::With,
+        system::{Commands, Query, Res},
     },
     input::{ButtonInput, keyboard::KeyCode},
     input_focus::{InputFocus, InputFocusVisible, directional_navigation::DirectionalNavigation},
@@ -20,6 +22,9 @@ use bevy::{
 
 const NORMAL_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_400;
 const FOCUSED_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_500;
+
+#[derive(Component)]
+pub struct MenuCamera;
 
 pub fn get_button_bundle(name: String) -> (Button, Node, BackgroundColor, Name) {
     return (
@@ -61,9 +66,9 @@ pub fn highlight_focused_element(
 ) {
     for (entity, mut border_color) in query.iter_mut() {
         if input_focus.0 == Some(entity) && input_focus_visible.0 {
-            border_color.0 = FOCUSED_BUTTON.into();
+            border_color.set_all(Color::Srgba(FOCUSED_BUTTON));
         } else {
-            border_color.0 = Color::NONE;
+            border_color.set_all(Color::NONE);
         }
     }
 }
@@ -80,5 +85,11 @@ pub fn reset_button_after_interaction(
         if reset_timer.just_finished() {
             color.0 = NORMAL_BUTTON.into();
         }
+    }
+}
+
+pub fn spawn_camera(query: Query<Entity, With<MenuCamera>>, mut commands: Commands) {
+    if query.is_empty() {
+        commands.spawn(Camera2d).insert(MenuCamera);
     }
 }

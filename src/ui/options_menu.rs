@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bevy::{
     app::{Plugin, PreUpdate, Update},
-    core_pipeline::core_2d::Camera2d,
+    camera::Camera2d,
     ecs::{
         component::Component,
         entity::Entity,
@@ -16,14 +16,16 @@ use bevy::{
     math::CompassOctant,
     state::{
         condition::in_state,
-        state::{NextState, OnEnter, OnExit, States},
+        state::{NextState, OnEnter, States},
+        state_scoped::DespawnOnExit,
     },
     ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
+    ui_widgets::{CoreSliderDragState, Slider, TrackClick},
     utils::default,
 };
 use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-use crate::state::State;
+use crate::{state::State, ui::common::spawn_camera};
 
 use super::common::{
     get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
@@ -48,9 +50,9 @@ pub struct Options;
 )]
 pub enum OptionsEnum {
     #[default]
-    Option_1,
-    Option_2,
-    Main_Menu,
+    Option1,
+    Option2,
+    MainMenu,
 }
 
 fn setup_ui(
@@ -58,15 +60,25 @@ fn setup_ui(
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
     mut input_focus: ResMut<InputFocus>,
 ) {
-    commands.spawn(Camera2d).insert(Options);
-
     let root_node = commands
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        })
+        .spawn((
+            DespawnOnExit(State::OptionsMenu),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+        ))
         .insert(Options)
+        .id();
+
+    let slider = commands
+        .spawn((
+            Slider {
+                track_click: TrackClick::Drag,
+            },
+            CoreSliderDragState::default(),
+        ))
         .id();
 
     let grid_root_entity = commands
@@ -80,6 +92,7 @@ fn setup_ui(
         })
         .id();
 
+    commands.entity(grid_root_entity).add_child(slider);
     commands.entity(root_node).add_child(grid_root_entity);
 
     let mut button_entities: Vec<Entity> = Vec::new();
@@ -108,7 +121,7 @@ fn interact_with_focused_button(
             for (e, name) in query.iter() {
                 if focused_entity == e {
                     match OptionsEnum::from_str(name.as_str()) {
-                        Ok(OptionsEnum::Main_Menu) => {
+                        Ok(OptionsEnum::MainMenu) => {
                             next_state.set(State::MainMenu);
                         }
                         _ => (),
@@ -119,26 +132,22 @@ fn interact_with_focused_button(
     }
 }
 
-fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<Options>>) {
-    for e in query.iter() {
-        commands.entity(e).despawn();
-    }
-}
-
 pub struct OptionsPlugin;
 impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        app.add_systems(OnEnter(State::OptionsMenu), setup_ui)
-            .add_systems(PreUpdate, navigate.run_if(in_state(State::OptionsMenu)))
-            .add_systems(
-                Update,
-                (
-                    highlight_focused_element,
-                    interact_with_focused_button,
-                    reset_button_after_interaction,
-                )
-                    .run_if(in_state(State::OptionsMenu)),
+        app.add_systems(
+            OnEnter(State::OptionsMenu),
+            (spawn_camera, setup_ui.after(spawn_camera)),
+        )
+        .add_systems(PreUpdate, navigate.run_if(in_state(State::OptionsMenu)))
+        .add_systems(
+            Update,
+            (
+                highlight_focused_element,
+                interact_with_focused_button,
+                reset_button_after_interaction,
             )
-            .add_systems(OnExit(State::OptionsMenu), cleanup_main_menu);
+                .run_if(in_state(State::OptionsMenu)),
+        );
     }
 }

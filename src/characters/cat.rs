@@ -1,4 +1,4 @@
-use crate::{camera::CameraRig, state::State};
+use crate::{game::camera::CameraRig, state::State};
 use bevy::prelude::*;
 
 #[derive(Default, Component)]
@@ -26,12 +26,12 @@ pub fn setup_cat(
         ..Default::default()
     };
     commands.spawn((
+        DespawnOnExit(State::Playing),
         Name::new("Cat"),
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
         MeshMaterial3d(material),
         Transform::from_xyz(-1.0, 0.5, 0.0),
         cat,
-        StateScoped(State::Playing),
     ));
 }
 
@@ -88,5 +88,14 @@ pub fn move_cat(
             let speed = 0.1; // tweak movement speed here
             transform.translation += move_direction * speed;
         }
+    }
+}
+
+pub fn exit_play(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<State>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        next_state.set(State::MainMenu);
     }
 }
