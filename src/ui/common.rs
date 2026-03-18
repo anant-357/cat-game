@@ -2,26 +2,37 @@ use bevy::{
     camera::Camera2d,
     color::{Color, Srgba},
     ecs::{
+        children,
         component::Component,
         entity::Entity,
+        hierarchy::{ChildOf, Children},
         name::Name,
         query::With,
+        spawn::{Spawn, SpawnRelated, SpawnRelatedBundle},
         system::{Commands, Query, Res},
     },
     input::{ButtonInput, keyboard::KeyCode},
-    input_focus::{InputFocus, InputFocusVisible, directional_navigation::DirectionalNavigation},
+    input_focus::{
+        InputFocus, InputFocusVisible, directional_navigation::DirectionalNavigation,
+        tab_navigation::TabIndex,
+    },
     math::CompassOctant,
+    picking::hover::Hovered,
     prelude::{Deref, DerefMut},
     time::{Time, Timer},
     ui::{
-        AlignItems, AlignSelf, BackgroundColor, BorderColor, JustifyContent, JustifySelf, Node,
-        UiRect, Val, widget::Button,
+        AlignItems, AlignSelf, BackgroundColor, BorderColor, BorderRadius, Display, FlexDirection,
+        JustifyContent, JustifyItems, JustifySelf, Node, PositionType, UiRect, Val, percent, px,
+        widget::Button,
     },
+    ui_widgets::{CoreSliderDragState, Slider, SliderRange, SliderThumb, SliderValue, TrackClick},
     utils::default,
 };
 
 const NORMAL_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_400;
 const FOCUSED_BUTTON: Srgba = bevy::color::palettes::tailwind::AMBER_500;
+const SLIDER_TRACK: Color = Color::srgb(0.05, 0.05, 0.05);
+const SLIDER_THUMB: Color = Color::srgb(0.35, 0.75, 0.35);
 
 #[derive(Component)]
 pub struct MenuCamera;
@@ -41,6 +52,97 @@ pub fn get_button_bundle(name: String) -> (Button, Node, BackgroundColor, Name) 
         },
         BackgroundColor::from(NORMAL_BUTTON),
         Name::new(name),
+    );
+}
+
+pub fn get_slider_bundle(
+    name: String,
+    value: f32,
+    min: f32,
+    max: f32,
+) -> (
+    Node,
+    Name,
+    Hovered,
+    Slider,
+    SliderValue,
+    SliderRange,
+    TabIndex,
+    SpawnRelatedBundle<
+        ChildOf,
+        (
+            Spawn<(Node, BackgroundColor, BorderRadius)>,
+            Spawn<(
+                bevy::prelude::Node,
+                SpawnRelatedBundle<
+                    ChildOf,
+                    Spawn<(
+                        SliderThumb,
+                        bevy::prelude::Node,
+                        BorderRadius,
+                        BackgroundColor,
+                    )>,
+                >,
+            )>,
+        ),
+    >,
+) {
+    return (
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Stretch,
+            justify_items: JustifyItems::Center,
+            column_gap: px(4),
+            height: px(12),
+            width: percent(30),
+            ..default()
+        },
+        Name::new(name),
+        Hovered::default(),
+        Slider {
+            track_click: TrackClick::Snap,
+        },
+        SliderValue(value),
+        SliderRange::new(min, max),
+        TabIndex(0),
+        Children::spawn((
+            // Slider background rail
+            Spawn((
+                Node {
+                    height: px(6),
+                    ..default()
+                },
+                BackgroundColor(SLIDER_TRACK), // Border color for the slider
+                BorderRadius::all(px(3)),
+            )),
+            Spawn((
+                Node {
+                    display: Display::Flex,
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    // Track is short by 12px to accommodate the thumb.
+                    right: px(12),
+                    top: px(0),
+                    bottom: px(0),
+                    ..default()
+                },
+                children![(
+                    SliderThumb,
+                    Node {
+                        display: Display::Flex,
+                        width: px(12),
+                        height: px(12),
+                        position_type: PositionType::Absolute,
+                        left: percent(0), // This will be updated by the slider's value
+                        ..default()
+                    },
+                    BorderRadius::MAX,
+                    BackgroundColor(SLIDER_THUMB),
+                )],
+            )),
+        )),
     );
 }
 

@@ -3,29 +3,39 @@ use std::str::FromStr;
 use bevy::{
     app::{Plugin, PreUpdate, Update},
     camera::Camera2d,
+    color::{Color, Gray, Srgba},
     ecs::{
         component::Component,
         entity::Entity,
+        hierarchy::Children,
         name::Name,
         query::With,
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
     },
     input::{ButtonInput, keyboard::KeyCode},
-    input_focus::{InputFocus, directional_navigation::DirectionalNavigationMap},
+    input_focus::{
+        InputFocus, directional_navigation::DirectionalNavigationMap, tab_navigation::TabIndex,
+    },
     math::CompassOctant,
     state::{
         condition::in_state,
         state::{NextState, OnEnter, States},
         state_scoped::DespawnOnExit,
     },
-    ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
-    ui_widgets::{CoreSliderDragState, Slider, TrackClick},
+    ui::{
+        AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent,
+        JustifyItems, Node, PositionType, RepeatedGridTrack, Val, percent, px, widget::Text,
+    },
+    ui_widgets::{CoreSliderDragState, Slider, SliderRange, SliderThumb, SliderValue, TrackClick},
     utils::default,
 };
 use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-use crate::{state::State, ui::common::spawn_camera};
+use crate::{
+    state::State,
+    ui::common::{get_slider_bundle, spawn_camera},
+};
 
 use super::common::{
     get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
@@ -52,6 +62,7 @@ pub enum OptionsEnum {
     #[default]
     Option1,
     Option2,
+    Option3,
     MainMenu,
 }
 
@@ -72,15 +83,6 @@ fn setup_ui(
         .insert(Options)
         .id();
 
-    let slider = commands
-        .spawn((
-            Slider {
-                track_click: TrackClick::Drag,
-            },
-            CoreSliderDragState::default(),
-        ))
-        .id();
-
     let grid_root_entity = commands
         .spawn(Node {
             display: Display::Grid,
@@ -92,18 +94,26 @@ fn setup_ui(
         })
         .id();
 
-    commands.entity(grid_root_entity).add_child(slider);
     commands.entity(root_node).add_child(grid_root_entity);
 
     let mut button_entities: Vec<Entity> = Vec::new();
     for option in OptionsEnum::iter() {
         let name: &'static str = option.into();
-        let button = commands
-            .spawn(get_button_bundle(name.into()))
-            .with_child(Text::new(name.to_string()))
-            .id();
-        commands.entity(grid_root_entity).add_child(button);
-        button_entities.push(button);
+        if name == "Option3" {
+            let slider = commands
+                .spawn(get_slider_bundle(name.into(), 10., 0., 100.))
+                .with_child(Text::new(name.to_string()))
+                .id();
+            commands.entity(grid_root_entity).add_child(slider);
+            button_entities.push(slider);
+        } else {
+            let button = commands
+                .spawn(get_button_bundle(name.into()))
+                .with_child(Text::new(name.to_string()))
+                .id();
+            commands.entity(grid_root_entity).add_child(button);
+            button_entities.push(button);
+        }
     }
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
     let top = button_entities[0];

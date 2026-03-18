@@ -16,6 +16,7 @@ use bevy::{
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
+        state_scoped::DespawnOnExit,
     },
     ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
     utils::default,
@@ -28,36 +29,36 @@ use super::common::{
     get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
 };
 
-#[derive(Component)]
-pub struct Areas;
-
 fn setup_ui(
     mut commands: Commands,
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
     mut input_focus: ResMut<InputFocus>,
 ) {
-    commands.spawn(Camera2d).insert(Areas);
-
     let root_node = commands
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        })
-        .insert(Areas)
+        .spawn((
+            DespawnOnExit(State::ChooseArea),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+        ))
         .id();
 
     let area_count = Area::COUNT;
 
     let grid_root_entity = commands
-        .spawn(Node {
-            display: Display::Grid,
-            width: Val::Percent(100.),
-            height: Val::Percent(100.),
-            grid_template_columns: RepeatedGridTrack::auto(1),
-            grid_template_rows: RepeatedGridTrack::auto((area_count + 1) as u16),
-            ..default()
-        })
+        .spawn((
+            DespawnOnExit(State::ChooseArea),
+            Node {
+                display: Display::Grid,
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                grid_template_columns: RepeatedGridTrack::auto(1),
+                grid_template_rows: RepeatedGridTrack::auto((area_count + 1) as u16),
+                ..default()
+            },
+        ))
         .id();
 
     commands.entity(root_node).add_child(grid_root_entity);
@@ -66,7 +67,10 @@ fn setup_ui(
     for area in Area::iter() {
         let name: &'static str = area.into();
         let button = commands
-            .spawn(get_button_bundle(name.to_string()))
+            .spawn((
+                DespawnOnExit(State::ChooseArea),
+                get_button_bundle(name.to_string()),
+            ))
             .with_child(Text::new(name.to_string()))
             .id();
         commands.entity(grid_root_entity).add_child(button);
@@ -74,7 +78,10 @@ fn setup_ui(
     }
 
     let exit_button_entity = commands
-        .spawn(get_button_bundle("Main Menu".to_string()))
+        .spawn((
+            DespawnOnExit(State::ChooseArea),
+            get_button_bundle("Main Menu".to_string()),
+        ))
         .with_child(Text::new("Main Menu"))
         .id();
     commands
@@ -115,12 +122,6 @@ fn interact_with_focused_button(
     }
 }
 
-fn cleanup_main_menu(mut commands: Commands, query: Query<Entity, With<Areas>>) {
-    for e in query.iter() {
-        commands.entity(e).despawn();
-    }
-}
-
 pub struct AreasMenuPlugin;
 impl Plugin for AreasMenuPlugin {
     fn build(&self, app: &mut bevy::app::App) {
@@ -137,7 +138,6 @@ impl Plugin for AreasMenuPlugin {
                 reset_button_after_interaction,
             )
                 .run_if(in_state(State::ChooseArea)),
-        )
-        .add_systems(OnExit(State::ChooseArea), cleanup_main_menu);
+        );
     }
 }
