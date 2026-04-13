@@ -1,3 +1,6 @@
 mod cat;
 
-pub use cat::{Cat, change_mode, exit_play, move_cat, setup_cat};
+pub use cat::{Cat, CatLocomotion, CatPlugin};
+
+// Exported for the setup_camera ordering constraint in main.rs
+pub use cat::setup_cat;

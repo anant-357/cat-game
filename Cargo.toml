@@ -1,5 +1,5 @@
 [package]
-name = "cat_game"
+name = "stray_embers"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,6 +7,7 @@ edition = "2024"
 debug = []
 
 [dependencies]
-bevy = { version = "0.17.2", features = ["experimental_bevy_ui_widgets"] }
-serde = "1.0.219"
-strum = { version = "0.27.1", features = ["derive"] }
+bevy = { version = "0.18.0", features = ["experimental_bevy_ui_widgets", "wav"] }
+serde = { version = "1.0.228", features = ["derive"] }
+ron = "0.9"
+strum = { version = "0.28.0", features = ["derive"] }

@@ -3,6 +3,7 @@ use std::str::FromStr;
 use bevy::{
     app::{Plugin, PreUpdate, Update},
     asset::AssetServer,
+    color::Color,
     ecs::{
         entity::Entity,
         name::Name,
@@ -20,14 +21,34 @@ use bevy::{
     },
     ui::{Interaction, widget::Button},
 };
-use strum::IntoEnumIterator;
+use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-use crate::{game::area::{Area, SelectedArea}, state::State, ui::common::spawn_camera};
+use crate::state::State;
 
 use super::common::{
-    BG_DARK, PANEL_BG, button_text, get_button_bundle, highlight_focused_element, navigate,
+    button_text, get_button_bundle, highlight_focused_element, navigate,
     reset_button_after_interaction, spawn_divider, spawn_menu_root, spawn_panel, spawn_title,
 };
+
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Default,
+    EnumIter,
+    IntoStaticStr,
+    EnumCount,
+    EnumString,
+)]
+pub enum PausedMenuEnum {
+    #[default]
+    Resume,
+    #[strum(to_string = "Main Menu")]
+    MainMenu,
+}
 
 fn setup_ui(
     mut commands: Commands,
@@ -38,22 +59,30 @@ fn setup_ui(
     let title_font = asset_server.load("fonts/Cinzel-Regular.ttf");
     let body_font = asset_server.load("fonts/Nunito-Regular.ttf");
 
-    let root = spawn_menu_root(&mut commands, State::ChooseArea, BG_DARK);
-    let panel = spawn_panel(&mut commands, State::ChooseArea, PANEL_BG);
+    // Semi-transparent overlay so the blurred game shows through
+    let root = spawn_menu_root(
+        &mut commands,
+        State::Paused,
+        Color::srgba(0.02, 0.02, 0.05, 0.75),
+    );
+    let panel = spawn_panel(
+        &mut commands,
+        State::Paused,
+        Color::srgba(0.04, 0.04, 0.09, 0.85),
+    );
     commands.entity(root).add_child(panel);
 
-    let title = spawn_title(&mut commands, "Choose Area", State::ChooseArea, title_font);
-    let divider = spawn_divider(&mut commands, State::ChooseArea);
+    let title = spawn_title(&mut commands, "Paused", State::Paused, title_font);
+    let divider = spawn_divider(&mut commands, State::Paused);
     commands.entity(panel).add_child(title);
     commands.entity(panel).add_child(divider);
 
-    let mut button_entities: Vec<Entity> = Vec::new();
-
-    for area in Area::iter() {
-        let name: &'static str = area.into();
+    let mut button_entities = Vec::new();
+    for item in PausedMenuEnum::iter() {
+        let name: &'static str = item.into();
         let button = commands
             .spawn((
-                DespawnOnExit(State::ChooseArea),
+                DespawnOnExit(State::Paused),
                 get_button_bundle(name.to_string()),
             ))
             .with_child(button_text(name, body_font.clone()))
@@ -62,22 +91,11 @@ fn setup_ui(
         button_entities.push(button);
     }
 
-    let exit_button_entity = commands
-        .spawn((
-            DespawnOnExit(State::ChooseArea),
-            get_button_bundle("Main Menu".to_string()),
-        ))
-        .with_child(button_text("Main Menu", body_font.clone()))
-        .id();
-    commands.entity(panel).add_child(exit_button_entity);
-    button_entities.push(exit_button_entity);
-
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
     input_focus.set(button_entities[0]);
 }
 
 fn interact_with_focused_button(
-    mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     input_focus: Res<InputFocus>,
@@ -94,12 +112,11 @@ fn interact_with_focused_button(
         if !activated {
             continue;
         }
-        match Area::from_str(name.as_str()) {
-            Ok(area) => {
-                commands.insert_resource(SelectedArea(area));
+        match PausedMenuEnum::from_str(name.as_str()) {
+            Ok(PausedMenuEnum::Resume) => {
                 next_state.set(State::Playing);
             }
-            _ if name.as_str() == "Main Menu" => {
+            Ok(PausedMenuEnum::MainMenu) => {
                 next_state.set(State::MainMenu);
             }
             _ => (),
@@ -107,22 +124,29 @@ fn interact_with_focused_button(
     }
 }
 
-pub struct AreasMenuPlugin;
-impl Plugin for AreasMenuPlugin {
+fn resume_on_escape(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<State>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        next_state.set(State::Playing);
+    }
+}
+
+pub struct PausedPlugin;
+impl Plugin for PausedPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        app.add_systems(
-            OnEnter(State::ChooseArea),
-            (spawn_camera, setup_ui.after(spawn_camera)),
-        )
-        .add_systems(PreUpdate, navigate.run_if(in_state(State::ChooseArea)))
-        .add_systems(
-            Update,
-            (
-                highlight_focused_element,
-                interact_with_focused_button,
-                reset_button_after_interaction,
-            )
-                .run_if(in_state(State::ChooseArea)),
-        );
+        app.add_systems(OnEnter(State::Paused), setup_ui)
+            .add_systems(PreUpdate, navigate.run_if(in_state(State::Paused)))
+            .add_systems(
+                Update,
+                (
+                    highlight_focused_element,
+                    interact_with_focused_button,
+                    reset_button_after_interaction,
+                    resume_on_escape,
+                )
+                    .run_if(in_state(State::Paused)),
+            );
     }
 }

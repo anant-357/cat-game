@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use bevy::{
     app::{AppExit, Plugin, PreUpdate, Update},
+    asset::AssetServer,
     ecs::{
         entity::Entity,
         message::MessageWriter,
@@ -10,7 +11,7 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
     },
-    input::{ButtonInput, keyboard::KeyCode},
+    input::{ButtonInput, keyboard::KeyCode, mouse::MouseButton},
     input_focus::{
         InputDispatchPlugin, InputFocus, InputFocusVisible,
         directional_navigation::{DirectionalNavigationMap, DirectionalNavigationPlugin},
@@ -21,15 +22,15 @@ use bevy::{
         state::{NextState, OnEnter, States},
         state_scoped::DespawnOnExit,
     },
-    ui::{Display, Node, RepeatedGridTrack, Val, widget::Text},
-    utils::default,
+    ui::{Interaction, widget::Button},
 };
 use strum::{EnumCount, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-use crate::{game::camera::setup_camera, state::State, ui::common::spawn_camera};
+use crate::{state::State, ui::common::spawn_camera};
 
 use super::common::{
-    get_button_bundle, highlight_focused_element, navigate, reset_button_after_interaction,
+    BG_DARK, PANEL_BG, button_text, get_button_bundle, highlight_focused_element, navigate,
+    reset_button_after_interaction, spawn_divider, spawn_menu_root, spawn_panel, spawn_title,
 };
 
 #[derive(
@@ -49,6 +50,7 @@ use super::common::{
 pub enum MainMenuEnum {
     #[default]
     Play,
+    #[strum(to_string = "Choose Area")]
     ChooseArea,
     Options,
     Exit,
@@ -58,33 +60,19 @@ fn setup_ui(
     mut commands: Commands,
     mut directional_nav_map: ResMut<DirectionalNavigationMap>,
     mut input_focus: ResMut<InputFocus>,
+    asset_server: Res<AssetServer>,
 ) {
-    let root_node = commands
-        .spawn((
-            DespawnOnExit(State::MainMenu),
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            },
-        ))
-        .id();
+    let title_font = asset_server.load("fonts/Cinzel-Regular.ttf");
+    let body_font = asset_server.load("fonts/Nunito-Regular.ttf");
 
-    let grid_root_entity = commands
-        .spawn((
-            DespawnOnExit(State::MainMenu),
-            Node {
-                display: Display::Grid,
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                grid_template_columns: RepeatedGridTrack::auto(1),
-                grid_template_rows: RepeatedGridTrack::auto(3),
-                ..default()
-            },
-        ))
-        .id();
+    let root = spawn_menu_root(&mut commands, State::MainMenu, BG_DARK);
+    let panel = spawn_panel(&mut commands, State::MainMenu, PANEL_BG);
+    commands.entity(root).add_child(panel);
 
-    commands.entity(root_node).add_child(grid_root_entity);
+    let title = spawn_title(&mut commands, "Stray Embers", State::MainMenu, title_font);
+    let divider = spawn_divider(&mut commands, State::MainMenu);
+    commands.entity(panel).add_child(title);
+    commands.entity(panel).add_child(divider);
 
     let mut button_entities: Vec<Entity> = Vec::new();
     for option in MainMenuEnum::iter() {
@@ -94,45 +82,48 @@ fn setup_ui(
                 DespawnOnExit(State::MainMenu),
                 get_button_bundle(name.into()),
             ))
-            .with_child(Text::new(name.to_string()))
+            .with_child(button_text(name, body_font.clone()))
             .id();
-        commands.entity(grid_root_entity).add_child(button_entity);
+        commands.entity(panel).add_child(button_entity);
         button_entities.push(button_entity);
     }
 
     directional_nav_map.add_looping_edges(&button_entities, CompassOctant::South);
-    let top = button_entities[0];
-    input_focus.set(top);
+    input_focus.set(button_entities[0]);
 }
 
 fn interact_with_focused_button(
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
     input_focus: Res<InputFocus>,
-    query: Query<(Entity, &Name), With<Name>>,
+    buttons: Query<(Entity, &Name, &Interaction), With<Button>>,
     mut exit: MessageWriter<AppExit>,
     mut next_state: ResMut<NextState<State>>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Space) {
-        if let Some(focused_entity) = input_focus.0 {
-            for (e, name) in query.iter() {
-                if focused_entity == e {
-                    match MainMenuEnum::from_str(name.as_str()) {
-                        Ok(MainMenuEnum::Play) => {
-                            next_state.set(State::Playing);
-                        }
-                        Ok(MainMenuEnum::ChooseArea) => {
-                            next_state.set(State::ChooseArea);
-                        }
-                        Ok(MainMenuEnum::Options) => {
-                            next_state.set(State::OptionsMenu);
-                        }
-                        Ok(MainMenuEnum::Exit) => {
-                            exit.write(AppExit::Success);
-                        }
-                        _ => (),
-                    }
-                }
+    let key_pressed = keyboard_input.just_pressed(KeyCode::Space)
+        || keyboard_input.just_pressed(KeyCode::Enter);
+    let mouse_clicked = mouse_input.just_pressed(MouseButton::Left);
+
+    for (entity, name, interaction) in &buttons {
+        let activated = (key_pressed && input_focus.0 == Some(entity))
+            || (mouse_clicked && *interaction == Interaction::Pressed);
+        if !activated {
+            continue;
+        }
+        match MainMenuEnum::from_str(name.as_str()) {
+            Ok(MainMenuEnum::Play) => {
+                next_state.set(State::Playing);
             }
+            Ok(MainMenuEnum::ChooseArea) => {
+                next_state.set(State::ChooseArea);
+            }
+            Ok(MainMenuEnum::Options) => {
+                next_state.set(State::OptionsMenu);
+            }
+            Ok(MainMenuEnum::Exit) => {
+                exit.write(AppExit::Success);
+            }
+            _ => (),
         }
     }
 }
